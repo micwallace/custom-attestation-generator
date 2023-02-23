@@ -8,9 +8,6 @@
     <meta name="robots" content="noindex">
     <meta name="googlebot" content="noindex">
     <link rel="stylesheet" type="text/css" href="styles.css">
-
-    <!-- Load production config -->
-    <!-- <script type="text/javascript" src="https://devcon-vi.attest.tickets/devcon6.js?v=0.25"></script> -->
   </head>
   <body>
       <div class="flexCenter flexColumn">
@@ -119,7 +116,7 @@
       <div class="flexCenter" style="margin-top: 50px;">
           <h4 style="display: block;">Validity</h4><br/>
       </div>
-      <div class="flexCenter validity-fields">
+      <div class="flexCenter horizontal-fields">
           <label>Enable
               <input id="validity-enable" type="checkbox" onchange="agen.validityToggle(this);" checked="checked">
           </label>
@@ -151,6 +148,21 @@
       </div>
       <div class="flexCenter" style="margin-top: 50px;">
           <button onclick="agen.validateAttestation();" type="button">Validate</button>
+      </div>
+      <div class="flexCenter" style="margin-top: 50px;">
+          <h4 style="display: block;">TokenScript QRCode</h4>
+      </div>
+      <div class="flexCenter horizontal-fields">
+          <label>Chain:
+              <input id="qr-chain" type="text" value="1" onchange="agen.renderQr();">
+          </label>
+          <label style="width: 450px;">Address:
+              <input style="width: 330px;" id="qr-address" type="text" value="0xc361201E5B1005cCDE47B32F223BC145DE393F62" onchange="agen.renderQr()">
+          </label>
+      </div>
+      <div class="flexCenter flexColumn" style="margin-bottom: 100px;">
+          <canvas id="qr-canvas" style="width: 200px; height: 200px;"></canvas>
+          <small id="qr-decimal" style="max-width: 600px; overflow-wrap: break-word;"></small>
       </div>
   </body>
 </html>

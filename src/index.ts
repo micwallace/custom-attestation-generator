@@ -3,7 +3,7 @@ import {SchemaGenerator} from "./SchemaGenerator";
 import {AsnSerializer} from "@peculiar/asn1-schema";
 import {KeyPair} from "@tokenscript/attestation/dist/libs/KeyPair";
 import {ethers} from "ethers";
-import {EpochTimeValidity} from "@tokenscript/attestation/dist/asn1/shemas/EpochTimeValidity";
+import QRCode from 'qrcode';
 
 declare global {
 	interface Window {
@@ -21,6 +21,11 @@ const attestationOutput = document.querySelector("#output-attestation") as HTMLT
 const validityEnable = document.querySelector("#validity-enable") as HTMLInputElement;
 const validityFrom = document.querySelector("#validity-from") as HTMLInputElement;
 const validityTo = document.querySelector("#validity-to") as HTMLInputElement;
+
+const qrCanvas = document.querySelector("#qr-canvas") as HTMLCanvasElement;
+const qrDecimal = document.querySelector("#qr-decimal") as HTMLSpanElement;
+const chainInput = document.querySelector("#qr-chain") as HTMLInputElement;
+const addressInput = document.querySelector("#qr-address") as HTMLInputElement;
 
 window.agen.testGenSchema = () => {
 
@@ -53,6 +58,22 @@ window.agen.testGenSchema = () => {
 	});
 }
 
+window.agen.renderQr = () => {
+
+	const attestation = "0x" + attestationOutput.value;
+	const chainId = chainInput.value;
+	const contractAddress = addressInput.value;
+
+	const decimalAddr: string = BigInt(contractAddress).toString(10);
+	const qrString = chainId.length + chainId + decimalAddr.padStart(49, "0") + BigInt(attestation).toString(10);
+
+	QRCode.toCanvas(qrCanvas, qrString, function (error) {
+		if (error) console.error(error)
+	})
+
+	qrDecimal.innerHTML = qrString;
+}
+
 window.agen.generateAttestation = () => {
 
 	try {
@@ -68,6 +89,7 @@ window.agen.generateAttestation = () => {
 		schemaOutput.value = JSON.stringify(schema.getSchemaDefinition(), null, 2);
 		attestationOutput.value = hexAttest;
 
+		window.agen.renderQr()
 
 	} catch (e){
 		console.error(e);
@@ -280,10 +302,8 @@ class CustomAttestationGenerator {
 		if (decoded.ticket.validity) {
 			let now = Math.round(new Date().getTime() / 1000);
 
-			console.log("Now: ", now);
-
 			if (decoded.ticket.validity.notBefore > now)
-				throw new Error("Attestation is not yet valid. " + decoded.ticket.validity.notBefore + " > " + now);
+				throw new Error("Attestation is not yet valid");
 
 			if (decoded.ticket.validity.notAfter < now)
 				throw new Error("Attestation has expired");

@@ -34,8 +34,11 @@
                       <td>
                           <label>Type
                               <select class="field-type">
-                                  <option value="Utf8String" selected>Utf8String</option>
                                   <option value="Integer">Integer</option>
+                                  <option value="Utf8String" selected>Utf8String</option>
+                                  <option value="Boolean">Boolean</option>
+                                  <option value="OctetString">OctetString</option>
+                                  <option value="BitString">BitString</option>
                               </select>
                           </label>
                       </td>
@@ -62,8 +65,11 @@
                       <td>
                           <label>Type
                               <select class="field-type">
-                                  <option value="Utf8String">Utf8String</option>
                                   <option value="Integer" selected>Integer</option>
+                                  <option value="Utf8String">Utf8String</option>
+                                  <option value="Boolean">Boolean</option>
+                                  <option value="OctetString">OctetString</option>
+                                  <option value="BitString">BitString</option>
                               </select>
                           </label>
                       </td>
@@ -90,8 +96,11 @@
                       <td>
                           <label>Type
                               <select class="field-type">
-                                  <option value="Utf8String">Utf8String</option>
                                   <option value="Integer" selected>Integer</option>
+                                  <option value="Utf8String">Utf8String</option>
+                                  <option value="Boolean">Boolean</option>
+                                  <option value="OctetString">OctetString</option>
+                                  <option value="BitString">BitString</option>
                               </select>
                           </label>
                       </td>
@@ -110,8 +119,14 @@
                       </td>
                   </tr>
               </tbody>
+              <tfoot>
+                <tr>
+                    <td colspan="5" style="text-align: right;">
+                        <button style="margin-top: 20px; float: right;" type="button" onclick="agen.addField();">Add Field</button>
+                    </td>
+                </tr>
+              </tfoot>
           </table>
-          <button style="margin-top: 20px;" type="button" onclick="agen.addField();">Add Field</button>
       </div>
       <div class="flexCenter" style="margin-top: 50px;">
           <h4 style="display: block;">Validity</h4><br/>

@@ -27,6 +27,14 @@ const qrDecimal = document.querySelector("#qr-decimal") as HTMLSpanElement;
 const chainInput = document.querySelector("#qr-chain") as HTMLInputElement;
 const addressInput = document.querySelector("#qr-address") as HTMLInputElement;
 
+const ASN_FIELD_TYPES = {
+	Integer: "Integer",
+	Utf8String: "Utf8String",
+	Boolean: "Boolean",
+	OctetString: "OctetString",
+	BitString: "BitString"
+}
+
 window.agen.testGenSchema = () => {
 
 	const ATTESTOR_PRIV_KEY = "7411181bdb51a24edd197bacda369830b1c89bbf872a4c2babbdd2e94f25d3b5";
@@ -140,12 +148,7 @@ function validateAndGetValues(){
 		schemaFields[name] = field;
 
 		if (value) {
-			switch (field.type) {
-				case "Integer":
-					value = parseInt(value);
-			}
-
-			fieldValues[name] = value;
+			fieldValues[name] = convertFieldValue(field.type, value);
 		}
 	}
 
@@ -159,6 +162,24 @@ function validateAndGetValues(){
 	}
 
 	return {schemaFields, fieldValues, validity};
+}
+
+function convertFieldValue(type: string, value: any){
+
+	switch (type) {
+		case ASN_FIELD_TYPES.Integer:
+			value = parseInt(value);
+			break;
+		case ASN_FIELD_TYPES.Boolean:
+			value = Boolean(value);
+			break;
+		case ASN_FIELD_TYPES.BitString:
+		case ASN_FIELD_TYPES.OctetString:
+			value = hexStringToUint8(value);
+			break;
+	}
+
+	return value;
 }
 
 window.agen.validateAttestation = () => {
@@ -188,36 +209,39 @@ window.agen.validateAttestation = () => {
 }
 
 window.agen.addField = () => {
-	schemaTable.innerHTML += `
-		<tr>
-			<td>
-				<label>Name
-					<input class="field-name" type="text"/>
-				</label>
-			</td>
-			<td>
-			  <label>Type
-				  <select class="field-type">
-					  <option value="Utf8String" selected>Utf8String</option>
-					  <option value="Integer">Integer</option>
-				  </select>
-			  </label>
-			</td>
-			<td>
-			  <label>Optional
-				<input class="field-optional" type="checkbox"/>
-			  </label>
-			</td>
-			<td>
-			  <label>Value
-				  <input class="field-value" type="text" value="6"/>
-			  </label>
-			</td>
-			<td>
-				<button type="button" onclick="agen.removeField(this)">X</button>
-			</td>
-		</tr>
+
+	const row = document.createElement("tr");
+
+	row.innerHTML = `
+		<td>
+			<label>Name
+				<input class="field-name" type="text"/>
+			</label>
+		</td>
+		<td>
+		  <label>Type
+			  <select class="field-type">
+				  ${Object.keys(ASN_FIELD_TYPES)
+					.map((type:string, index) => `<option value="${type}" ${index === 0 ? "selected" : ""}>${type}</option>`).join("\n")}
+			  </select>
+		  </label>
+		</td>
+		<td>
+		  <label>Optional
+			<input class="field-optional" type="checkbox"/>
+		  </label>
+		</td>
+		<td>
+		  <label>Value
+			  <input class="field-value" type="text"/>
+		  </label>
+		</td>
+		<td>
+			<button type="button" onclick="agen.removeField(this)">X</button>
+		</td>
 	`;
+
+	schemaTable.append(row);
 }
 
 window.agen.removeField = (elem: Element) => {

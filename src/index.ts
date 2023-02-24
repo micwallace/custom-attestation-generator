@@ -148,7 +148,7 @@ function validateAndGetValues(){
 		schemaFields[name] = field;
 
 		if (value) {
-			fieldValues[name] = convertFieldValue(field.type, value);
+			fieldValues[name] = convertFieldValue(field.type, name, value);
 		}
 	}
 
@@ -164,11 +164,13 @@ function validateAndGetValues(){
 	return {schemaFields, fieldValues, validity};
 }
 
-function convertFieldValue(type: string, value: any){
+function convertFieldValue(type: string, name: string, value: any){
 
 	switch (type) {
 		case ASN_FIELD_TYPES.Integer:
 			value = parseInt(value);
+			if (isNaN(value))
+				throw new Error("Field value for '" + name + "' is not a valid number, please change the field type or value to match");
 			break;
 		case ASN_FIELD_TYPES.Boolean:
 			value = Boolean(value);
@@ -234,10 +236,11 @@ window.agen.addField = () => {
 		<td>
 		  <label>Value
 			  <input class="field-value" type="text"/>
+			  <button type="button" onclick="agen.formatHex(this)" title="Format hex string">0x</button>
 		  </label>
 		</td>
 		<td>
-			<button type="button" onclick="agen.removeField(this)">X</button>
+			<button type="button" onclick="agen.removeField(this)" title="Remove row">X</button>
 		</td>
 	`;
 
@@ -246,6 +249,17 @@ window.agen.addField = () => {
 
 window.agen.removeField = (elem: Element) => {
 	elem.parentElement.parentElement.remove();
+}
+
+window.agen.formatHex = (elem: Element) => {
+	const str = elem.parentElement.parentElement.querySelector(".field-value") as HTMLInputElement;
+
+	let val = str.value.toUpperCase();
+
+	if (val.indexOf("0X") === 0)
+		val = val.substring(2);
+
+	str.value = val;
 }
 
 window.agen.validityToggle = (elem: HTMLInputElement) => {

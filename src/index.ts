@@ -155,8 +155,10 @@ function validateAndGetValues(){
 	let validity: null|{from: number, to: number} = null;
 
 	if (validityEnable.checked){
-		const from = Math.round(validityFrom.valueAsNumber / 1000);
-		const to = Math.round(validityTo.valueAsNumber / 1000);
+		let userTimezoneOffset = new Date().getTimezoneOffset() * 60000;
+
+		const from = Math.round((validityFrom.valueAsNumber + userTimezoneOffset) / 1000);
+		const to = Math.round((validityTo.valueAsNumber + userTimezoneOffset) / 1000);
 
 		validity = {from, to};
 	}
@@ -265,9 +267,13 @@ window.agen.formatHex = (elem: Element) => {
 window.agen.validityToggle = (elem: HTMLInputElement) => {
 
 	if (elem.checked){
-		validityFrom.valueAsNumber = Date.now();
+		const now = new Date();
+		let userTimezoneOffset = now.getTimezoneOffset() * 60000;
+		userTimezoneOffset *= Math.sign(userTimezoneOffset);
+
+		validityFrom.valueAsNumber = new Date(now.getTime() + userTimezoneOffset).getTime();
 		validityFrom.removeAttribute("disabled");
-		validityTo.valueAsNumber = Date.now() + 86400000;
+		validityTo.valueAsNumber = new Date((now.getTime() + userTimezoneOffset) + 86400000).getTime();
 		validityTo.removeAttribute("disabled");
 	} else {
 		validityFrom.value = "";
@@ -309,12 +315,12 @@ class CustomAttestationGenerator {
 
 		console.log("Encoded: ", encoded);
 
-		this.verifyAttestation(encoded);
+		this.verifyAttestation(encoded, true);
 
 		return encoded;
 	}
 
-	public verifyAttestation(hexAttestation: string){
+	public verifyAttestation(hexAttestation: string, warnValidityOnly = false){
 
 		const generatedSchema = this.generateAttestationSchema();
 
@@ -340,11 +346,15 @@ class CustomAttestationGenerator {
 		if (decoded.ticket.validity) {
 			let now = Math.round(new Date().getTime() / 1000);
 
-			if (decoded.ticket.validity.notBefore > now)
-				throw new Error("Attestation is not yet valid");
+			if (decoded.ticket.validity.notBefore > now) {
+				const msg = "Attestation is not yet valid";
+				if (warnValidityOnly) alert("Warning: " + msg); else throw new Error(msg);
+			}
 
-			if (decoded.ticket.validity.notAfter < now)
-				throw new Error("Attestation has expired");
+			if (decoded.ticket.validity.notAfter < now) {
+				const msg = "Attestation has expired";
+				if (warnValidityOnly) alert("Warning: " + msg); else throw new Error(msg);
+			}
 
 			console.log("Ticket validity verified");
 		}

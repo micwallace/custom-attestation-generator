@@ -1,9 +1,7 @@
-import {hexStringToUint8, uint8tohex} from "@tokenscript/attestation/dist/libs/utils";
-import {SchemaGenerator} from "./SchemaGenerator";
-import {AsnSerializer} from "@peculiar/asn1-schema";
+import {hexStringToUint8} from "@tokenscript/attestation/dist/libs/utils";
 import {KeyPair} from "@tokenscript/attestation/dist/libs/KeyPair";
-import {ethers} from "ethers";
 import QRCode from 'qrcode';
+import {CustomAttestationGenerator, ISchemaFieldConfig} from "./CustomAttestationGenerator";
 
 declare global {
 	interface Window {
@@ -68,6 +66,20 @@ window.agen.testGenSchema = () => {
 
 window.agen.renderQr = () => {
 
+	renderQr();
+
+	if (!document.location.hash.length)
+		return;
+
+	const query = new URLSearchParams(document.location.hash.substring(1));
+
+	query.set("address", addressInput.value);
+	query.set("chain", chainInput.value);
+
+	document.location.hash = query.toString();
+}
+
+function renderQr(){
 	const attestation = "0x" + attestationOutput.value;
 	const chainId = chainInput.value;
 	const contractAddress = addressInput.value;
@@ -97,17 +109,15 @@ window.agen.generateAttestation = () => {
 		schemaOutput.value = JSON.stringify(schema.getSchemaDefinition(), null, 2);
 		attestationOutput.value = hexAttest;
 
-		window.agen.renderQr()
+		renderQr()
+
+		updateURLHash(schemaFields, fieldValues, validity);
 
 	} catch (e){
 		console.error(e);
 		alert(e.message);
 	}
 
-}
-
-interface ISchemaFieldConfig {
-	[name: string]: { type: string, optional: boolean }
 }
 
 function getKeyPair(){
@@ -212,32 +222,32 @@ window.agen.validateAttestation = () => {
 	}
 }
 
-window.agen.addField = () => {
+window.agen.addField = (name?: string, fieldType?: string, optional?: boolean, value?: any) => {
 
 	const row = document.createElement("tr");
 
 	row.innerHTML = `
 		<td>
 			<label>Name
-				<input class="field-name" type="text"/>
+				<input class="field-name" type="text" value="${name !== undefined ? name : ''}"/>
 			</label>
 		</td>
 		<td>
 		  <label>Type
 			  <select class="field-type">
 				  ${Object.keys(ASN_FIELD_TYPES)
-					.map((type:string, index) => `<option value="${type}" ${index === 0 ? "selected" : ""}>${type}</option>`).join("\n")}
+					.map((type:string, index) => `<option value="${type}" ${fieldType === type || (!fieldType && index === 0) ? "selected" : ""}>${type}</option>`).join("\n")}
 			  </select>
 		  </label>
 		</td>
 		<td>
 		  <label>Optional
-			<input class="field-optional" type="checkbox"/>
+			<input class="field-optional" type="checkbox" ${optional === true ? 'checked' : ''}/>
 		  </label>
 		</td>
 		<td>
 		  <label>Value
-			  <input class="field-value" type="text"/>
+			  <input class="field-value" type="text" value="${value !== undefined ? value : ''}"/>
 			  <button type="button" onclick="agen.formatHex(this)" title="Format hex string">0x</button>
 		  </label>
 		</td>
@@ -295,143 +305,81 @@ window.agen.viewInAsnDecoder = () => {
 	window.open("https://lapo.it/asn1js/#" + attestation, "_blank");
 }
 
-class CustomAttestationGenerator {
+function handleUrlLoad(){
 
-	constructor(private customFields: ISchemaFieldConfig, private attestorKeys: KeyPair, private hasValidity = false) {
+	if (document.location.hash.length > 1){
 
-	}
+		const query = new URLSearchParams(document.location.hash.substring(1));
 
-	public generateAndSignAttestation(fieldValues: {[name: string]: any}, validity?: {from: number, to: number}){
+		const fields = query.getAll("field");
 
-		const generatedSchema = this.generateAttestationSchema();
-
-		let attestation = this.createAttestationFromSchema(generatedSchema, fieldValues, validity);
-
-		attestation = this.signAttestation(attestation);
-
-		console.log("Generated attestation: ", attestation);
-
-		let encoded = generatedSchema.serializeAndFormat(attestation);
-
-		console.log("Encoded: ", encoded);
-
-		this.verifyAttestation(encoded, true);
-
-		return encoded;
-	}
-
-	public verifyAttestation(hexAttestation: string, warnValidityOnly = false){
-
-		const generatedSchema = this.generateAttestationSchema();
-
-		let decoded = generatedSchema.parse(hexAttestation);
-
-		console.log("Decoded: ");
-		console.log(decoded);
-
-		const encAttestation = AsnSerializer.serialize(decoded.ticket);
-
-		let payloadHash = hexStringToUint8(ethers.utils.keccak256(new Uint8Array(encAttestation)));
-
-		// TODO: Optionally use address like smart contract validation
-		//let address = ethers.utils.recoverAddress(payloadHash, ethers.utils.splitSignature(new Uint8Array(this.linkedAttestation.signatureValue)));
-
-		let pubKey = ethers.utils.recoverPublicKey(payloadHash, ethers.utils.splitSignature(new Uint8Array(decoded.signatureValue)));
-
-		if (pubKey.substring(2) !== this.attestorKeys.getPublicKeyAsHexStr())
-			throw new Error("Attestor public key does not match, expected " + this.attestorKeys.getPublicKeyAsHexStr() + " got " + pubKey.substring(2));
-
-		console.log("Signature successfully verified");
-
-		if (decoded.ticket.validity) {
-			let now = Math.round(new Date().getTime() / 1000);
-
-			if (decoded.ticket.validity.notBefore > now) {
-				const msg = "Attestation is not yet valid";
-				if (warnValidityOnly) alert("Warning: " + msg); else throw new Error(msg);
+		if (fields.length) {
+			for (let field of fields){
+				const [name, type, optional, value] = field.split("-");
+				window.agen.addField(name, type, optional === "true", value);
 			}
-
-			if (decoded.ticket.validity.notAfter < now) {
-				const msg = "Attestation has expired";
-				if (warnValidityOnly) alert("Warning: " + msg); else throw new Error(msg);
-			}
-
-			console.log("Ticket validity verified");
-		}
-	}
-
-	public createAttestationFromSchema(schema: SchemaGenerator, fields: {[key: string]: any}, validity?: {from: number, to: number}){
-
-		let asnObject = schema.getSchemaObject();
-
-		for (let i in fields){
-			asnObject.ticket[i] = fields[i];
+		} else {
+			addDefaultFields();
 		}
 
-		if (validity){
-			asnObject.ticket.validity.notBefore = validity.from;
-			asnObject.ticket.validity.notAfter = validity.to;
+		let userTimezoneOffset = new Date().getTimezoneOffset() * 60000;
+		userTimezoneOffset *= Math.sign(userTimezoneOffset);
+
+		if (query.has("validFrom") || query.has("validTo")){
+			if (query.has("validFrom"))
+				validityFrom.valueAsNumber = new Date((parseInt(query.get("validFrom")) * 1000) + userTimezoneOffset).getTime();
+
+			if (query.has("validTo"))
+				validityTo.valueAsNumber = new Date((parseInt(query.get("validTo")) * 1000) + userTimezoneOffset).getTime();
+		} else {
+			validityEnable.checked = false;
+			window.agen.validityToggle(validityEnable);
 		}
 
-		console.log("Created attest", asnObject);
+		if (query.has("address"))
+			addressInput.value = query.get("address");
 
-		return asnObject;
+		if (query.has("chain"))
+			chainInput.value = query.get("chain");
+
+		window.agen.generateAttestation();
+	} else {
+		addDefaultFields();
+	}
+}
+
+function addDefaultFields(){
+	// Load default fields
+	window.agen.addField("devconId", "UTF8String", false, "6");
+	window.agen.addField("ticketIdNumber", "Integer", false, 5);
+	window.agen.addField("ticketClass", "Integer", false, 1);
+}
+
+document.addEventListener("DOMContentLoaded", handleUrlLoad);
+
+window.agen.testUpdateUrlHash = () => {
+
+	const {schemaFields, fieldValues, validity} = validateAndGetValues();
+
+	updateURLHash(schemaFields, fieldValues, validity);
+}
+
+function updateURLHash(schemaFields: ISchemaFieldConfig, fieldValues: {[name: string]: any}, validity?: {from: number, to: number}){
+
+	const query = new URLSearchParams();
+
+	for (let fieldName in schemaFields){
+		const config = schemaFields[fieldName];
+		query.append("field", `${fieldName}-${config.type}-${config.optional}-${fieldValues[fieldName]}`);
 	}
 
-	public signAttestation(attestation: any){
-
-		const encodedAttest = AsnSerializer.serialize(attestation.ticket);
-
-		// TODO: Add signing algorithm
-		//this.linkedAttestation.signingAlgorithm = new AlgorithmIdentifierASN();
-		//this.linkedAttestation.signingAlgorithm.algorithm = "1.2.840.10045.4.2"; // Our own internal identifier for ECDSA with keccak256
-
-		attestation.signatureValue = hexStringToUint8(this.attestorKeys.signRawBytesWithEthereum(Array.from(new Uint8Array(encodedAttest))));
-
-		return attestation;
+	if (validity) {
+		query.set("validFrom", validity.from.toString());
+		query.set("validTo", validity.to.toString());
 	}
 
-	public generateAttestationSchema(){
-		return new SchemaGenerator(this.getSchemaDefinition());
-	}
+	query.set("address", addressInput.value);
+	query.set("chain", chainInput.value);
 
-	public getSchemaDefinition(){
-
-		const inbuiltFields: any = {};
-
-		if (this.hasValidity){
-			console.log("Schema created with validity");
-
-			inbuiltFields.validity = {
-				name: "Validity",
-				items: {
-					notBefore: {
-						type: "Integer",
-						optional: false
-					},
-					notAfter: {
-						type: "Integer",
-						optional: false
-					}
-				}
-			}
-		}
-
-		const schema: any = {
-			ticket: {
-				name: "Ticket",
-				items: {
-					...this.customFields,
-					...inbuiltFields
-				}
-			},
-			signatureValue: {
-				type: "BitString",
-				optional: false
-			}
-		}
-
-		return schema;
-	}
-
+	document.location.hash = query.toString();
 }
